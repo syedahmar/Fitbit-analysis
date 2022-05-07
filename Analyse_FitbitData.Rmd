@@ -1,0 +1,339 @@
+---
+title: "R Notebook"
+output: html_notebook
+Author: Syed Ahmar Shah
+Created on: 07 May 2022
+---
+
+The Fitbit data is stored in json format. Let's import the fitbit data into R using an external library.
+```{r}
+
+# clear the space and load all the relevant libraries
+rm(list=ls())
+library(jsonlite)
+library(tidyverse)
+library(lubridate)
+
+# set the folder path and assign the filenames 
+
+folder_path <- 'X:/X/YourFitbitFolder/'  
+folder_name <- 'Physical Activity/'
+file_name_part_start <- 'exercise-'
+file_name_part_end <- seq (from = 0, to=1400, by=100)
+file_extension <-'.json'
+sel_names <-c('activityName','averageHeartRate','calories','duration','startTime')
+
+for (k_part in file_name_part_end){
+  file_selected <- paste0(folder_path,folder_name,file_name_part_start,k_part,file_extension)
+  data_loaded<-fromJSON(file_selected)
+  if(k_part == file_name_part_end[1])
+  {
+    data_loaded<-data_loaded%>%
+      select(all_of(sel_names))
+    data_all <- data_loaded
+    rm(data_loaded)
+    }
+  else
+  {
+    data_loaded<-data_loaded%>%
+      select(all_of(sel_names))
+    data_all<-rbind(data_all,data_loaded)
+    rm(data_loaded)
+  }
+}
+
+```
+
+Get the initial numbers: total number of sessions and total duration in a specific period, per each activity type
+```{r}
+time_start=ymd('2020-04-1')
+time_end=ymd('2022-03-31')
+activity_type=c('Elliptical','Run','Walk','Outdoor Bike')
+
+data_selected<-data_all%>%
+  filter(activityName %in% activity_type)%>%
+  mutate(startTime=mdy_hms(startTime))%>%
+  filter(startTime>=time_start)%>%
+  filter(startTime<=time_end)%>%
+  arrange(startTime)
+
+data_summary<-data_selected%>%
+  group_by(activityName)%>%
+  mutate(total_duration=sum(duration)/(1000*60*60))%>%
+  mutate(total_sessions=n())%>%
+  mutate(longest_session=max(duration)/(1000*60))%>%
+  mutate(shortest_session=min(duration)/(1000*60))%>%
+  mutate(total_calories=sum(calories))%>%
+  mutate(mean_heartRate=mean(averageHeartRate))%>%
+  select(-averageHeartRate,-calories,-startTime)%>%
+  filter(row_number()==1)
+  
+```
+
+Let us now create a dataframe that we will use to daily plot bar charts, multiple panels, one for each month
+
+```{r}
+data_activity<-data_all%>%
+  filter(activityName %in% activity_type)%>%
+  mutate(startTime=mdy_hms(startTime))%>%
+  filter(startTime>=time_start & startTime<=time_end)%>%
+  mutate(month_number=month(startTime))%>%
+  mutate(year_number=year(startTime))%>%
+  mutate(startTime_round=round(startTime,unit="day"))%>%
+  group_by(startTime_round,activityName)%>%
+  mutate(date_number=day(startTime_round))%>%
+  mutate(duration_per_day=sum(duration/(1000*60)))%>%
+  mutate(total_calories=sum(calories))%>%
+  mutate(mean_heartRate=mean(averageHeartRate))%>%
+  filter(row_number()==1)%>%
+  select(-duration,-startTime,-calories,-averageHeartRate)%>%
+  mutate(period_name = case_when(
+    (month_number==4&year_number==2020)~'April-2020',
+    (month_number==5&year_number==2020)~'May-2020',
+    (month_number==6&year_number==2020)~'June-2020',
+    (month_number==7&year_number==2020)~'July-2020',
+    (month_number==8&year_number==2020)~'August-2020',
+    (month_number==9&year_number==2020)~'September-2020',
+    (month_number==10&year_number==2020)~'October-2020',
+    (month_number==11&year_number==2020)~'November-2020',
+    (month_number==12&year_number==2020)~'December-2020',
+    (month_number==1&year_number==2021)~'January-2021',
+    (month_number==2&year_number==2021)~'February-2021',
+    (month_number==3&year_number==2021)~'March-2021',
+    (month_number==4&year_number==2021)~'April-2021',
+    (month_number==5&year_number==2021)~'May-2021',
+    (month_number==6&year_number==2021)~'June-2021',
+    (month_number==7&year_number==2021)~'July-2021',
+    (month_number==8&year_number==2021)~'August-2021',
+    (month_number==9&year_number==2021)~'September-2021',
+    (month_number==10&year_number==2021)~'October-2021',
+    (month_number==11&year_number==2021)~'November-2021',
+    (month_number==12&year_number==2021)~'December-2021',
+    (month_number==1&year_number==2022)~'January-2022',
+    (month_number==2&year_number==2022)~'February-2022',
+    (month_number==3&year_number==2022)~'March-2022',
+    TRUE~'other'))
+
+# arrange the month numbers (as factors to aid in plotting)
+data_activity$period_name <-factor(data_activity$period_name, levels=c("April-2020",
+                                                                 "May-2020",
+                                                                 "June-2020",
+                                                                 "July-2020",
+                                                                 "August-2020",
+                                                                 "September-2020",
+                                                                 "October-2020",
+                                                                 "November-2020",
+                                                                 "December-2020",
+                                                                 "January-2021",
+                                                                 "February-2021",
+                                                                 "March-2021",
+                                                                 "April-2021",
+                                                                 "May-2021",
+                                                                 "June-2021",
+                                                                 "July-2021",
+                                                                 "August-2021",
+                                                                 "September-2021",
+                                                                 "October-2021",
+                                                                 "November-2021",
+                                                                 "December-2021",
+                                                                 "January-2022",
+                                                                 "February-2022",
+                                                                 "March-2022"))
+
+# divide the data into two intervals
+year1<-interval(ymd('2020-04-01'),ymd('2021-03-31'))
+year2<-interval(ymd('2021-04-01'),ymd('2022-03-31'))
+
+## Plot Activity Duration ##
+
+p1 <- ggplot(subset(data_activity,startTime_round %within% year1),aes(x=date_number, y=duration_per_day, fill=activityName))+geom_bar(stat="identity", width=0.8)+facet_wrap(~period_name)+labs(title="April 2020 - March 2021",x='Date',y='Duration (Minutes)')+coord_cartesian(ylim=c(0, 90))
+p2 <- ggplot(subset(data_activity,startTime_round %within% year2),aes(x=date_number, y=duration_per_day, fill=activityName))+geom_bar(stat="identity", width=0.8)+facet_wrap(~period_name)+labs(title="April 2021 - March 2022",x='Date',y='Duration (Minutes)')+coord_cartesian(ylim=c(0, 90))
+
+ggsave(filename='year1_duration.png',plot=p1,dpi=300,height=5,width=10)
+ggsave(filename='year2_duration.png',plot=p2,dpi=300,height=5,width=10)
+
+## Plot Average Heart Rate ## (explain position dodge)
+
+p1 <- ggplot(subset(data_activity,startTime_round %within% year1),aes(x=date_number, y=mean_heartRate, fill=activityName))+geom_bar(stat="identity", width=0.8,position="dodge")+facet_wrap(~period_name)+labs(title="April 2020 - March 2021",x='Date',y='Mean Heat Rate')
+p2 <- ggplot(subset(data_activity,startTime_round %within% year2),aes(x=date_number, y=mean_heartRate, fill=activityName))+geom_bar(stat="identity", width=0.8,position="dodge")+facet_wrap(~period_name)+labs(title="April 2021 - March 2022",x='Date',y='Mean Heart Rate')
+ggsave(filename='year1_heartRate.png',plot=p1,dpi=300,height=5,width=10)
+ggsave(filename='year2_heartRate.png',plot=p2,dpi=300,height=5,width=10)
+
+## Plot Net Calories ## (explain position stack)
+
+p1 <- ggplot(subset(data_activity,startTime_round %within% year1),aes(x=date_number, y=total_calories, fill=activityName))+geom_bar(stat="identity", width=0.8,position="stack")+facet_wrap(~period_name)+labs(title="April 2020 - March 2021",x='Date',y='Total Calories')+coord_cartesian(ylim=c(0, 1500))
+p2 <- ggplot(subset(data_activity,startTime_round %within% year2),aes(x=date_number, y=total_calories, fill=activityName))+geom_bar(stat="identity", width=0.8,position="stack")+facet_wrap(~period_name)+labs(title="April 2021 - March 2022",x='Date',y='Total Calories')+coord_cartesian(ylim=c(0, 1500))
+ggsave(filename='year1_calories.png',plot=p1,dpi=300,height=5,width=10)
+ggsave(filename='year2_calories.png',plot=p2,dpi=300,height=5,width=10)
+
+
+### Let us now create the monthly plot for total calories and total duration###
+data_activity_monthly<-data_activity%>%
+  group_by(period_name,activityName)%>%
+  mutate(total_calories_monthly=sum(total_calories))%>%
+  mutate(total_duration_monthly=sum(duration_per_day)/60)%>%
+  mutate(days_in_month=days_in_month(startTime_round))%>%
+  mutate(average_duration_daily=60*total_duration_monthly/days_in_month)%>%
+  select(period_name,activityName,total_duration_monthly,total_calories_monthly,startTime_round,days_in_month,average_duration_daily)%>%
+  filter(row_number()==1)
+
+# plot monthly calories
+p1 <- ggplot(data_activity_monthly,aes(x=period_name, y=total_calories_monthly, fill=activityName))+geom_bar(stat="identity", width=0.8,position="stack")+labs(title="April 2020 - March 2022",x='Date',y='Total Calories')+theme(axis.text.x=element_text(angle=90))
+
+ggsave(filename='calories_monthly.png',plot=p1,dpi=300,height=5,width=10)
+
+# plot monthly duration
+p1 <- ggplot(data_activity_monthly,aes(x=period_name, y=total_duration_monthly, fill=activityName))+geom_bar(stat="identity", width=0.8,position="stack")+labs(title="April 2020 - March 2022",x='Date',y='Total Duration (Hours)')+theme(axis.text.x=element_text(angle=90))
+
+ggsave(filename='duration_monthly.png',plot=p1,dpi=300,height=5,width=10)
+
+#average daily duration for each month
+p1 <- ggplot(data_activity_monthly,aes(x=period_name, y=average_duration_daily, fill=activityName))+geom_bar(stat="identity", width=0.8,position="stack")+labs(title="April 2020 - March 2022",x='Date',y='Mean daily duration (minutes)')+theme(axis.text.x=element_text(angle=90))+ scale_y_continuous(breaks = c(0,30,45,60,75,90,120))
+ggsave(filename='duration_mean_daily.png',plot=p1,dpi=300,height=5,width=10)
+
+
+```
+
+## Let us now investigate Vo2 Max
+
+```{r}
+rm(list=ls())
+library(jsonlite)
+library(tidyverse)
+library(lubridate)
+
+folder_path <- 'D:/Personal/My-2Year-Review/OxguruSomeone/'  
+folder_name <- 'Physical Activity/'
+file_name_part_start <- 'exercise-'
+file_name_part_end <- seq (from = 0, to=1400, by=100)
+file_extension <-'.json'
+sel_names <-c('activityName','averageHeartRate','calories','duration','startTime','distance',
+              'elevationGain','speed','VO2Max_new')
+
+for (k_part in file_name_part_end){
+  file_selected <- paste0(folder_path,folder_name,file_name_part_start,k_part,file_extension)
+  data_loaded<-fromJSON(file_selected)
+  if (!('vo2Max' %in% colnames(data_loaded)))
+  {
+   next 
+  }
+  
+  if(k_part == file_name_part_end[1] )  
+  {
+    data_loaded<-data_loaded%>%
+      mutate(VO2Max_new=vo2Max$vo2Max)%>%
+      select(all_of(sel_names))%>%
+      filter(!is.na(VO2Max_new))%>%
+      mutate(startTime=mdy_hms(startTime))%>%
+      mutate(startTime_round=round(startTime,unit="day"))
+    
+    data_all <- data_loaded
+    rm(data_loaded)
+    }
+  else
+  {
+    data_loaded<-data_loaded%>%
+      mutate(VO2Max_new=vo2Max$vo2Max)%>%
+      select(all_of(sel_names))%>%
+      filter(!is.na(VO2Max_new))%>%
+      mutate(startTime=mdy_hms(startTime))%>%
+      mutate(startTime_round=round(startTime,unit="day"))
+    
+    data_all<-rbind(data_all,data_loaded)
+    rm(data_loaded)
+  }
+}
+
+p1 <-ggplot(data=data_all,aes(x=as.Date(startTime),y=VO2Max_new))+geom_point()+geom_smooth(size=3)+labs(title="June 2019 - March 2022",x='Date (month-year)',y='VO2 max')+scale_x_date(date_breaks = "1 month", date_labels =  "%b %Y")+theme(axis.text.x=element_text(angle=90))
+ggsave(filename='Vo2Max.png',plot=p1,dpi=300,height=5,width=10)
+```
+
+Let us now plot the time zones of exercise (month by month)
+```{r}
+time_start=ymd('2020-04-1')
+time_end=ymd('2022-03-31')
+activity_type=c('Elliptical','Run','Walk','Outdoor Bike')
+
+data_activity<-data_all%>%
+  filter(activityName %in% activity_type)%>%
+  mutate(startTime=mdy_hms(startTime))%>%
+  filter(startTime>=time_start & startTime<=time_end)%>%
+  mutate(month_number=month(startTime))%>%
+  mutate(year_number=year(startTime))%>%
+  mutate(startTime_round=round(startTime,unit="day"))%>%
+  mutate(startTime_hour = hour(round(startTime,unit="hour")))%>%
+  mutate(duration_minutes=duration/(1000*60))%>%
+  mutate(session_length=case_when(duration_minutes<35~'0-35 minutes',
+         (duration_minutes>=35 & duration_minutes<65)~'35-65 minutes',
+         (duration_minutes>=65 & duration_minutes<95)~'65-95 minutes',
+         (duration_minutes>=95)~'over 95 minutes',
+         TRUE ~ 'unknown'))%>%
+  mutate(period_name = case_when( (month_number>=4&month_number<=6&year_number==2020)~'April-June 2020',
+    (month_number>=7&month_number<=9&year_number==2020)~'July-September 2020',
+    (month_number>=10&month_number<=12&year_number==2020)~'October-December 2020',
+    (month_number>=1&month_number<=3&year_number==2021)~'January-March 2021',
+    (month_number>=4&month_number<=6&year_number==2021)~'April-June 2021',
+    (month_number>=7&month_number<=9&year_number==2021)~'July-September 2021',
+    (month_number>=10&month_number<=12&year_number==2021)~'October-December 2021',
+    (month_number>=1&month_number<=3&year_number==2022)~'January-March 2022',
+    TRUE~'other'))
+
+# adjust for daylight savings
+data_activity<-data_activity%>%
+  mutate(startTime_hour=if_else(startTime_hour %in% as.double(c(4:10)),(startTime_hour+1),as.double(startTime_hour)))
+
+# arrange the month numbers (as factors to aid in plotting)
+data_activity$period_name <-factor(data_activity$period_name, levels=c("April-June 2020",
+                                                                 "July-September 2020",
+                                                                 "October-December 2020",
+                                                                 "January-March 2021",
+                                                                 "April-June 2021",
+                                                                 "July-September 2021",
+                                                                 "October-December 2021",
+                                                                 "January-March 2022"))
+
+plot_periods=c("April-June 2020",
+               "July-September 2020",
+               "October-December 2020",
+               "January-March 2021",
+               "April-June 2021",
+               "July-September 2021",
+               "October-December 2021",
+               "January-March 2022")
+
+for (plot_period in plot_periods){
+  g1=ggplot(subset(data_activity,period_name==plot_period), aes(x = startTime_hour,fill=`session_length`)) + geom_histogram(breaks = seq(0, 
+    24), colour = "grey") +coord_polar(start = 0) +theme_minimal() + 
+    scale_fill_brewer() + ylab("Count") + ggtitle(plot_period) + 
+    scale_x_continuous("", limits = c(0, 24), breaks = seq(0, 24), labels = seq(0, 
+        24))
+  ggsave(filename=paste0('TimingPlot_',plot_period,'.png'),plot=g1,dpi=300,height=10,width=20)
+}
+
+
+g1=ggplot(data_activity, aes(x = startTime_hour,fill=`session_length`)) + geom_histogram(breaks = seq(0, 
+    24), colour = "grey") +coord_polar(start = 0) +theme_minimal() + 
+    scale_fill_brewer() + ylab("Count") + ggtitle(plot_period) + 
+    scale_x_continuous("", limits = c(0, 24), breaks = seq(0, 24), labels = seq(0, 
+        24))
+  ggsave(filename='TimingPlot_overall.png',plot=g1,dpi=300,height=10,width=20)
+
+
+## let us plot intensity vs duration
+  
+g1 <- ggplot(data=data_activity,aes(x=duration_minutes,y=averageHeartRate))+geom_point()+geom_smooth() +coord_cartesian(xlim=c(0,120),ylim=c(90,170))+labs(title='Duration vs average Heart Rate')+xlab('duration (minutes)')+ylab('average heart rate')
+g1
+
+ggsave(filename='Duration-Intensity.png',plot=g1,dpi=300,height=10,width=20)
+## let us plot calories vs duration
+  
+g1 <- ggplot(data=data_activity,aes(x=duration_minutes,y=calories))+geom_point()+geom_smooth() +labs(title='Duration vs Calories')+xlab('duration (minutes)')+ylab('Calories burnt')
+g1
+ggsave(filename='Duration-Calories.png',plot=g1,dpi=300,height=10,width=20)
+```
+
+
+
+
+
+
